@@ -122,7 +122,63 @@ resource "aws_iam_role_policy" "jenkins_ecr" {
         ]
 
         Resource = aws_ecr_repository.app.arn
+      },
+
+      {
+        Effect = "Allow"
+
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+
+        Resource = [
+          "arn:aws:s3:::anis-terraform-state-521464398227/jenkins-lab/terraform.tfstate",
+          "arn:aws:s3:::anis-terraform-state-521464398227/jenkins-lab/terraform.tfstate.tflock"
+        ]
+      },
+      {
+        Effect = "Allow"
+
+        Action = [
+          "s3:ListBucket"
+        ]
+
+        Resource = "arn:aws:s3:::anis-terraform-state-521464398227"
+
+        Condition = {
+          StringLike = {
+            "s3:prefix" = [
+              "jenkins-lab/*"
+            ]
+          }
+        }
+      },
+
+      {
+        Effect = "Allow"
+
+        Action = [
+          "iam:GetRole",
+          "iam:GetRolePolicy",
+          "iam:GetInstanceProfile",
+          "iam:ListRolePolicies"
+        ]
+
+        Resource = "*"
+      },
+
+      {
+        Effect = "Allow"
+
+        Action = [
+          "sts:AssumeRole"
+        ]
+
+        Resource = aws_iam_role.terraform_deployment.arn
       }
+
     ]
   })
 }
@@ -131,3 +187,30 @@ resource "aws_iam_instance_profile" "jenkins" {
   name = "jenkins-ecr-profile"
   role = aws_iam_role.jenkins_ecr.name
 }
+
+
+resource "aws_iam_role" "terraform_deployment" {
+  name = "terraform-deployment-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+
+        Principal = {
+          AWS = aws_iam_role.jenkins_ecr.arn
+        }
+
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "terraform_deployment_admin" {
+  role       = aws_iam_role.terraform_deployment.name
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+}
+
